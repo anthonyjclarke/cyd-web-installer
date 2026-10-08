@@ -1,0 +1,198 @@
+# Reusable firmware workflow for CYD projects. It builds every board on each
+# push and pull request. On a `v*` tag it also publishes a GitHub release and
+# the web installer to the calling repo's GitHub Pages.
+#
+# Release images come only from here, never from a local build: a local build
+# compiles in include/secrets.h. A tag must equal `v` + FIRMWARE_VERSION, carry
+# no pre-release suffix (no -dev), and point at a commit on main. Manifests
+# list bootloader, partitions, boot_app0 and the app as four parts - never the
+# merged image, which wipes NVS.
+#
+# Caller contract and the ~10-line caller: README.md. Extracted from
+# CYD_AnimatedPixelClock's firmware.yml (v1.4.0).
+
+name: CYD firmware
+
+on:
+  workflow_call:
+    inputs:
+      config-header:
+        description: Header holding PROJECT_NAME and FIRMWARE_VERSION
+        type: string
+        default: include/config.h
+      envs:
+        description: Space-separated envs to build (default every [env:] in platformio.ini)
+        type: string
+        default: ""
+      secret-files:
+        description: Space-separated paths that must not exist in the tree
+        type: string
+        default: include/secrets.h
+      tools-ref:
+        description: Ref of cyd-web-installer to take tools/ and installer/ from
+        type: string
+        default: main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # the tag check needs origin/main
+
+      - name: Refuse local secrets
+        env:
+          SECRET_FILES: ${{ inputs.secret-files }}
+        run: |
+          for f in $SECRET_FILES; do
+            if [ -e "$f" ]; then
+              echo "::error::$f is in the tree - release images must build without it"
+              exit 1
+            fi
+          done
+
+      - name: Fetch installer tools
+        uses: actions/checkout@v7
+        with:
+          repository: anthonyjclarke/cyd-web-installer
+          ref: ${{ inputs.tools-ref }}
+          path: .cyd-web-installer
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Read and check the version
+        id: ver
+        env:
+          CONFIG_HEADER: ${{ inputs.config-header }}
+        run: |
+          INFO=$(python3 .cyd-web-installer/tools/make_manifests.py --config "$CONFIG_HEADER" --info)
+          echo "$INFO" >> "$GITHUB_OUTPUT"
+          VER=$(echo "$INFO" | sed -n 's/^version=//p')
+          PROJECT=$(echo "$INFO" | sed -n 's/^project=//p')
+          [ -n "$VER" ] && [ -n "$PROJECT" ] || { echo "::error::FIRMWARE_VERSION or PROJECT_NAME is empty"; exit 1; }
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            [ "$GITHUB_REF_NAME" = "v$VER" ] || { echo "::error::Tag $GITHUB_REF_NAME does not match FIRMWARE_VERSION $VER"; exit 1; }
+            case "$VER" in *-*) echo "::error::$VER is a pre-release version and cannot be published"; exit 1 ;; esac
+            git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "::error::$GITHUB_REF_NAME is not on main"; exit 1; }
+          fi
+          echo "$PROJECT $VER"
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+
+      - name: Install PlatformIO
+        run: pip install platformio==6.1.19
+
+      - name: Build every board
+        env:
+          ENVS: ${{ inputs.envs }}
+        run: |
+          [ -n "$ENVS" ] || ENVS=$(sed -n 's/^\[env:\(.*\)\]$/\1/p' platformio.ini)
+          args=()
+          for e in $ENVS; do args+=(-e "$e"); done
+          pio run "${args[@]}"
+
+      - name: Assemble installer site
+        env:
+          CONFIG_HEADER: ${{ inputs.config-header }}
+        run: python3 .cyd-web-installer/tools/make_manifests.py --config "$CONFIG_HEADER" --out _site
+
+      # make_manifests.py already refuses these; checked again on the output
+      # because an NVS-wiping manifest is the one mistake users can't undo.
+      - name: Check manifests
+        run: |
+          for m in _site/manifest-*.json; do
+            n=$(jq '.builds[0].parts | length' "$m")
+            [ "$n" = 4 ] || { echo "::error::$m has $n parts, expected 4"; exit 1; }
+            if jq -r '.builds[0].parts[].path' "$m" | grep -q merged; then
+              echo "::error::$m lists a merged image - it erases NVS"; exit 1
+            fi
+          done
+
+      # Not deployed: a dev build is never published. Download it and serve
+      # it on localhost to try the installer from a branch.
+      - name: Keep site preview
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v7
+        with:
+          name: site-preview
+          path: _site
+          retention-days: 7
+
+      - name: Stage release files
+        if: github.ref_type == 'tag'
+        env:
+          PROJECT: ${{ steps.ver.outputs.project }}
+          VER: ${{ steps.ver.outputs.version }}
+        run: |
+          mkdir release
+          for b in .pio/build/*/; do
+            e=$(basename "$b")
+            [ -f "$b/firmware-merged.bin" ] || continue
+            cp "$b/firmware.bin" "release/$PROJECT-v$VER-$e-firmware.bin"
+            cp "$b/firmware-merged.bin" "release/$PROJECT-v$VER-$e-merged.bin"
+          done
+          (cd release && sha256sum -- *.bin > SHA256SUMS.txt)
+          ls -l release
+
+      - name: Keep release files
+        if: github.ref_type == 'tag'
+        uses: actions/upload-artifact@v7
+        with:
+          name: release
+          path: release
+
+      - name: Keep Pages site
+        if: github.ref_type == 'tag'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+
+  publish:
+    if: github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # release
+      pages: write     # deploy
+      id-token: write  # deploy
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: release
+          path: release
+
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: release/*
+          body: |
+            **Install from your browser:** https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+            Chrome, Edge or Opera on a desktop. A board already running this firmware is offered **Update**, which keeps its settings and WiFi.
+
+            | File | Use |
+            |:--|:--|
+            | `*-firmware.bin` | App image only – for a web OTA update on a running device |
+            | `*-merged.bin` | Clean install at `0x0` with esptool – **erases settings and WiFi** |
+            | `SHA256SUMS.txt` | Checksums |
+
+            Changes: see [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/CHANGELOG.md).
+
+      - id: deploy
+        uses: actions/deploy-pages@v5
