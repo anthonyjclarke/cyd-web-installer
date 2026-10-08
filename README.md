@@ -163,3 +163,10 @@ built with your `secrets.h`.
   button when the board changes.
 - A partition-table change after release needs an erase, and the release
   notes must say so.
+
+---
+
+## Licence
+
+MIT – see [`LICENSE`](LICENSE). The vendored Improv library in
+`copy-in/lib/ImprovWiFi/` keeps its own MIT licence (Jonathas Barbosa).
