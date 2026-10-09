@@ -157,6 +157,9 @@ built with your `secrets.h`.
   Connect. So Improv listens in `loop()`, not only on a fresh device.
 - jnthas *Improv WiFi Library* 0.0.2–0.0.4 drops every second request. Use
   the vendored copy in `copy-in/lib/ImprovWiFi`.
+- Improv packets must start on a new line. ESP Web Tools drops a reply that
+  follows serial noise, so Connect intermittently offers **Install** instead
+  of **Update**. The vendored copy writes a `\n` before each packet.
 - Chrome holds the serial port while the installer dialog is open. Close
   it before opening a serial monitor.
 - ESP Web Tools caches the manifest per button, so the page builds a fresh

@@ -15,6 +15,13 @@ frame. Every second request is then dropped, including ESP Web Tools'
 `GET_DEVICE_INFO` after `GET_CURRENT_STATE`, and Connect never offers
 **Update**.
 
+A second fix, also marked, starts every packet on a new line. ESP Web Tools'
+Improv parser only accepts a packet at the start of a line, and when Chrome
+opens the port the stream often begins with noise (NULs, or part of a debug
+line). Without the newline the reply is dropped, Connect times out after
+1.5 s, and the dialog offers **Install** instead of **Update**. It is
+intermittent, so it can pass a single bench test.
+
 Copy it to `lib/ImprovWiFi/`, and remove any `jnthas/Improv WiFi Library`
 line from `lib_deps`. With both present, two copies collide.
 
