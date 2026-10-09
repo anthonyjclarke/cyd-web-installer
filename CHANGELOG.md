@@ -11,6 +11,12 @@
   and `make_manifests.py` adds the same query to every part path, because ESP
   Web Tools resolves parts against the manifest URL without its query.
   Reported by F1_CYD_Notifications.
+- `copy-in/src/network/improv_setup.cpp` names the device after the MAC's
+  last two bytes (`SplitFlap-AE8C` for `…:AE:8C`). It used the low 16 bits of
+  `getEfuseMac()`, which hold the first two bytes, the vendor prefix, so
+  every board from one vendor got the same suffix. Cosmetic: it only changes
+  the name shown in the installer dialog. Reported by CYD_WifiScan_Display
+  and CYD_Split-Flap-Clock.
 
 ## [1.0.2] 09-10-2026
 
