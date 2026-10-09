@@ -100,6 +100,15 @@ jobs:
           for e in $ENVS; do args+=(-e "$e"); done
           pio run "${args[@]}"
 
+      # Only for envs with custom_installer_fs = yes (none by default).
+      - name: Build filesystem images
+        env:
+          CONFIG_HEADER: ${{ inputs.config-header }}
+        run: |
+          for e in $(python3 .cyd-web-installer/tools/make_manifests.py --config "$CONFIG_HEADER" --fs-envs); do
+            pio run -e "$e" -t buildfs
+          done
+
       - name: Assemble installer site
         env:
           CONFIG_HEADER: ${{ inputs.config-header }}
@@ -111,7 +120,13 @@ jobs:
         run: |
           for m in _site/manifest-*.json; do
             n=$(jq '.builds[0].parts | length' "$m")
-            [ "$n" = 4 ] || { echo "::error::$m has $n parts, expected 4"; exit 1; }
+            last=$(jq -r '.builds[0].parts[-1].path' "$m")
+            case "$n" in
+              4) ;;
+              5) echo "$last" | grep -Eq '/(littlefs|spiffs)\.bin(\?|$)' \
+                   || { echo "::error::$m: a fifth part must be the filesystem image, got $last"; exit 1; } ;;
+              *) echo "::error::$m has $n parts, expected 4 (or 5 with a filesystem image)"; exit 1 ;;
+            esac
             if jq -r '.builds[0].parts[].path' "$m" | grep -q merged; then
               echo "::error::$m lists a merged image - it erases NVS"; exit 1
             fi
@@ -139,6 +154,9 @@ jobs:
             [ -f "$b/firmware-merged.bin" ] || continue
             cp "$b/firmware.bin" "release/$PROJECT-v$VER-$e-firmware.bin"
             cp "$b/firmware-merged.bin" "release/$PROJECT-v$VER-$e-merged.bin"
+            for fs in littlefs spiffs; do
+              if [ -f "$b/$fs.bin" ]; then cp "$b/$fs.bin" "release/$PROJECT-v$VER-$e-$fs.bin"; fi
+            done
           done
           (cd release && sha256sum -- *.bin > SHA256SUMS.txt)
           ls -l release
@@ -190,6 +208,7 @@ jobs:
             |:--|:--|
             | `*-firmware.bin` | App image only – for a web OTA update on a running device |
             | `*-merged.bin` | Clean install at `0x0` with esptool – **erases settings and WiFi** |
+            | `*-littlefs.bin` (if present) | Filesystem image – write it at the data partition offset given in the installer's `manifest-<board>.json` |
             | `SHA256SUMS.txt` | Checksums |
 
             Changes: see [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/CHANGELOG.md).

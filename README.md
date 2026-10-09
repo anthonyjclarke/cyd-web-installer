@@ -45,6 +45,7 @@ the Improv pieces (see [`copy-in/README.md`](copy-in/README.md)).
 | One `[env:]` per board                    | One manifest and button per board      |
 | `custom_installer_label` per env          | Board picker text, no HTML edits       |
 | `custom_installer_hint` (optional)        | One line under the label               |
+| `custom_installer_fs = yes` (optional)    | Ships the filesystem image; see below  |
 | `extra_scripts = post:tools/merge_bin.py` | Writes `flash_parts.json`              |
 | Standard 4 MB dual-OTA partitions         | Frozen once released; one recipe       |
 | Improv-Serial, always on (advised)        | WiFi in the dialog; offers Update      |
@@ -59,6 +60,20 @@ its Update and Configure WiFi lines, because ESP Web Tools can offer neither.
 
 An env without `custom_installer_label` is still built in CI but left out of
 the installer.
+
+### Filesystem image (optional, 1.1)
+
+An env that needs files in LittleFS or SPIFFS at first boot (fonts, images)
+sets `custom_installer_fs = yes`, with `board_build.filesystem` in the same
+env or in `[env]`. CI then runs `pio run -e <env> -t buildfs`, and the
+manifest gets a fifth part: `littlefs.bin` (or `spiffs.bin`) at the data
+partition's offset, read from the built `partitions.bin`. The image must be
+exactly the partition's size, which `buildfs` already makes it.
+
+**Install and Update both rewrite that partition.** Whatever the firmware
+stored there is lost on every update. Keep settings and caches in NVS, and
+use the filesystem only for files that ship with the firmware. Small web UIs
+belong in PROGMEM instead.
 
 ---
 
@@ -109,14 +124,16 @@ the release images and deploys Pages. The guards are these:
 3. The version must have no pre-release suffix (no `-dev`).
 4. The tagged commit must be on `main`.
 5. Each manifest lists exactly four parts: `bootloader.bin`,
-   `partitions.bin`, `boot_app0.bin` and the app. It never lists
+   `partitions.bin`, `boot_app0.bin` and the app, plus the filesystem image
+   as a fifth for an env that opts in. It never lists
    `firmware-merged.bin`, because `merge_bin` fills NVS with `0xFF` and an
    "Update" would wipe WiFi and settings. Both `make_manifests.py` and a
    workflow step check this.
 
 The release carries `*-firmware.bin` (the app, for web OTA),
 `*-merged.bin` (a clean install at `0x0` that erases NVS) and
-`SHA256SUMS.txt`.
+`SHA256SUMS.txt`, plus `*-littlefs.bin` for an env that ships its filesystem.
+The merged image never contains the filesystem.
 
 ---
 

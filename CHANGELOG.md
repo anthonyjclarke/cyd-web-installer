@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.1.0] 10-10-2026
+
+### Added
+
+- Optional filesystem image as a fifth manifest part, for FS option C. An env
+  opts in with `custom_installer_fs = yes`. CI runs `pio run -t buildfs` for
+  it, and `make_manifests.py` adds `littlefs.bin` / `spiffs.bin` at the data
+  partition's offset, read from the built `partitions.bin`. It checks that
+  the image is exactly the partition's size and lies past the app slots.
+  `--fs-envs` lists the opted-in envs for the workflow. The manifest check
+  accepts four parts, or five when the fifth is the filesystem image. The
+  release also carries `*-littlefs.bin`. Specified by CYD_Family_Clock, its
+  first user.
+
+### Unchanged
+
+- Projects that don't opt in: manifests and `index.json` are byte-identical
+  to 1.0.3, and `merge_bin.py` needs no re-copy.
+
 ## [1.0.3] 10-10-2026
 
 ### Fixed

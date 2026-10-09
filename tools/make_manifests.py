@@ -20,6 +20,12 @@ rather than "Install".
 `--info` prints `project=` and `version=` lines and builds nothing; CI uses
 it for the tag checks, so the version is parsed in one place only.
 
+An env with `custom_installer_fs = yes` also ships its filesystem image
+(`pio run -t buildfs` output) as a fifth part, at the data partition's offset
+read from the built partitions.bin. Install and Update both write it, so that
+filesystem may hold shipped assets only, never settings. `--fs-envs` lists
+those envs for CI's buildfs step.
+
 Release checks (tag vs version, no -dev) belong to CI, not here, so the site
 can be built and tried locally from a -dev build.
 """
@@ -30,6 +36,7 @@ import json
 import os
 import re
 import shutil
+import struct
 import sys
 from pathlib import Path
 from urllib.parse import quote
@@ -60,17 +67,42 @@ def config_string(text, name, config_h):
 
 
 def installer_envs(root):
+    """Envs with an installer label, and {env: filesystem} for those that
+    opt in to shipping their filesystem image."""
     ini = configparser.ConfigParser(interpolation=None, inline_comment_prefixes=(";",))
     ini.read(root / "platformio.ini", encoding="utf-8")
-    envs = []
+    envs, fs = [], {}
     for section in ini.sections():
         if section.startswith("env:") and ini.has_option(section, "custom_installer_label"):
+            env = section[len("env:"):]
             envs.append({
-                "env": section[len("env:"):],
+                "env": env,
                 "label": ini.get(section, "custom_installer_label"),
                 "hint": ini.get(section, "custom_installer_hint", fallback=""),
             })
-    return envs
+            if ini.get(section, "custom_installer_fs", fallback="no").strip().lower() in ("yes", "true", "1"):
+                default = ini.get("env", "board_build.filesystem", fallback="spiffs") \
+                    if ini.has_section("env") else "spiffs"
+                fs[env] = ini.get(section, "board_build.filesystem", fallback=default).strip()
+    return envs, fs
+
+
+def data_partition(partitions_bin):
+    """(offset, size) of the SPIFFS/LittleFS data partition, and the end of the
+    last app partition, from a built partitions.bin. Entries are 32 bytes:
+    magic AA 50, type, subtype, offset u32 LE, size u32 LE, label, flags."""
+    raw = Path(partitions_bin).read_bytes()
+    data, app_end = None, 0
+    for i in range(0, len(raw) - 31, 32):
+        if raw[i:i + 2] != b"\xaa\x50":
+            break  # MD5 entry or erased flash ends the table
+        ptype, subtype = raw[i + 2], raw[i + 3]
+        offset, size = struct.unpack_from("<II", raw, i + 4)
+        if ptype == 0x00:
+            app_end = max(app_end, offset + size)
+        elif ptype == 0x01 and subtype in (0x82, 0x83) and data is None:
+            data = (offset, size)  # 0x82 spiffs (LittleFS uses it too), 0x83 littlefs
+    return data, app_end
 
 
 def check_parts(env, parts):
@@ -99,6 +131,8 @@ def main():
                     help="installer page to publish (default: this repo's generic page)")
     ap.add_argument("--info", action="store_true",
                     help="print project= and version= lines, then exit")
+    ap.add_argument("--fs-envs", action="store_true",
+                    help="print the envs with custom_installer_fs = yes, then exit")
     args = ap.parse_args()
 
     root = Path(args.project).resolve()
@@ -112,7 +146,11 @@ def main():
         print("project=%s\nversion=%s" % (project, version))
         return
 
-    envs = installer_envs(root)
+    envs, fs_envs = installer_envs(root)
+    if args.fs_envs:
+        for env in fs_envs:
+            print(env)
+        return
     if not envs:
         sys.exit("error: no env in platformio.ini has custom_installer_label")
 
@@ -142,6 +180,24 @@ def main():
             # which doesn't carry its own query string over.
             parts.append({"path": "firmware/%s/%s?v=%s" % (b["env"], src.name, quote(version)),
                           "offset": part["offset"]})
+
+        if b["env"] in fs_envs:
+            filesystem = fs_envs[b["env"]]
+            image = build / ("%s.bin" % filesystem)
+            if not image.exists():
+                sys.exit("error: %s missing - run pio run -e %s -t buildfs" % (image, b["env"]))
+            partition, app_end = data_partition(build / "partitions.bin")
+            if partition is None:
+                sys.exit("error: %s: no spiffs/littlefs data partition in partitions.bin" % b["env"])
+            offset, size = partition
+            if offset < app_end:
+                sys.exit("error: %s: data partition 0x%x overlaps the app slots" % (b["env"], offset))
+            if image.stat().st_size != size:
+                sys.exit("error: %s is %d bytes, but its partition is %d"
+                         % (image, image.stat().st_size, size))
+            shutil.copy2(image, dest / image.name)
+            parts.append({"path": "firmware/%s/%s?v=%s" % (b["env"], image.name, quote(version)),
+                          "offset": offset})
 
         manifest = {
             "name": project,
