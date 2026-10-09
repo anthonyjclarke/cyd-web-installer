@@ -32,6 +32,7 @@ import re
 import shutil
 import sys
 from pathlib import Path
+from urllib.parse import quote
 
 TOOLS_ROOT = Path(__file__).resolve().parent.parent
 # The first three parts, in flash order. The fourth is the app image.
@@ -135,7 +136,11 @@ def main():
         for part in built:
             src = Path(part["path"])
             shutil.copy2(src, dest / src.name)
-            parts.append({"path": "firmware/%s/%s" % (b["env"], src.name),
+            # ?v= makes each release a new URL. Pages serves with max-age=600,
+            # so a browser could otherwise flash a cached part from the last
+            # release. ESP Web Tools resolves parts against the manifest URL,
+            # which doesn't carry its own query string over.
+            parts.append({"path": "firmware/%s/%s?v=%s" % (b["env"], src.name, quote(version)),
                           "offset": part["offset"]})
 
         manifest = {

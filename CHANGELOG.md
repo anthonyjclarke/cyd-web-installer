@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.3] 10-10-2026
+
+### Fixed
+
+- A browser that had the page open before a release could get the previous
+  release's manifest and parts from cache for up to 10 minutes, since GitHub
+  Pages serves them with `max-age=600`. ESP Web Tools then showed neither
+  Install nor Update. The page now loads each manifest with `?v=<version>`,
+  and `make_manifests.py` adds the same query to every part path, because ESP
+  Web Tools resolves parts against the manifest URL without its query.
+  Reported by F1_CYD_Notifications.
+
 ## [1.0.2] 09-10-2026
 
 ### Fixed

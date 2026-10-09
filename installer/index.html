@@ -124,13 +124,15 @@
       $("title").textContent = info.project;
       $("version").textContent = "Firmware " + info.version;
 
+      // ?v= skips a manifest cached from the previous release (Pages: max-age=600).
+      const manifestUrl = (b) => b.manifest + "?v=" + encodeURIComponent(info.version);
       info.boards.forEach((b, i) => {
         const input = el("input", { type: "radio", name: "board", value: b.manifest, checked: i === 0 });
-        input.addEventListener("change", () => showButton(b.manifest));
+        input.addEventListener("change", () => showButton(manifestUrl(b)));
         $("boards").append(el("label", { className: "board" },
           input, el("strong", {}, b.label), el("span", {}, b.hint)));
       });
-      showButton(info.boards[0].manifest);
+      showButton(manifestUrl(info.boards[0]));
 
       // Older index.json files have no "improv" key; they all had Improv.
       if (info.improv === false) {
