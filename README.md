@@ -53,7 +53,9 @@ the Improv pieces (see [`copy-in/README.md`](copy-in/README.md)).
 `index.json` also picks up these optional `config.h` strings when present:
 `PROJECT_REPO_URL` (otherwise the GitHub repo URL), `UPSTREAM_PROJECT`,
 `UPSTREAM_AUTHOR` and `UPSTREAM_REPO_URL` (a "Based on" credit), and `AP_NAME`
-(the setup hotspot, shown as a WiFi alternative).
+(the setup hotspot, shown as a WiFi alternative). `#define IMPROV_SETUP_ENABLED 1` in the
+same header tells the page the firmware has Improv. Without it, the page drops
+its Update and Configure WiFi lines, because ESP Web Tools can offer neither.
 
 An env without `custom_installer_label` is still built in CI but left out of
 the installer.

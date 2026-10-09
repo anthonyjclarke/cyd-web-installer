@@ -45,6 +45,12 @@ def config_value(text, name):
     return m.group(1) if m else None
 
 
+def improv_enabled(text):
+    """True when the header has `#define IMPROV_SETUP_ENABLED 1`."""
+    m = re.search(r'^\s*#define\s+IMPROV_SETUP_ENABLED\s+(\d+)', text, re.M)
+    return bool(m and int(m.group(1)))
+
+
 def config_string(text, name, config_h):
     value = config_value(text, name)
     if value is None:
@@ -156,6 +162,9 @@ def main():
             "repository": config_value(cfg, "UPSTREAM_REPO_URL") or "",
         }
     index["setupAp"] = config_value(cfg, "AP_NAME") or ""  # "" if the project has none
+    # Without Improv the installer never offers Update or Configure WiFi, so
+    # the page hides the lines that promise them.
+    index["improv"] = improv_enabled(cfg)
     index["boards"] = boards
     (out / "index.json").write_text(json.dumps(index, indent=2, ensure_ascii=False) + "\n")
     shutil.copy2(args.page, out / "index.html")

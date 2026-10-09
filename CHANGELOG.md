@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.2] 09-10-2026
+
+### Fixed
+
+- The installer page no longer promises **Update** or **Configure WiFi** for
+  a project without Improv. `make_manifests.py` writes `"improv"` to
+  `index.json` from `#define IMPROV_SETUP_ENABLED` in the config header (false
+  when absent). The page then hides the Update line, and keeps the WiFi line
+  only for the setup hotspot (`AP_NAME`). An `index.json` without the key is
+  treated as Improv-enabled. Manifests are unchanged. Reported by
+  AuroraDemo_CYD.
+
 ## [1.0.1] 09-10-2026
 
 ### Fixed

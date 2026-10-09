@@ -74,7 +74,7 @@
   <h2>What to expect</h2>
   <ul>
     <li><strong>First install:</strong> say yes when asked to erase the device.</li>
-    <li><strong>Already running this firmware?</strong> The installer recognises it
+    <li id="update-step"><strong>Already running this firmware?</strong> The installer recognises it
       and offers <em>Update</em>. Your settings and WiFi are kept.</li>
     <li id="wifi-step"><strong>WiFi:</strong> after installing, choose
       <em>Configure WiFi</em> in the installer.</li>
@@ -132,7 +132,16 @@
       });
       showButton(info.boards[0].manifest);
 
-      if (info.setupAp) {
+      // Older index.json files have no "improv" key; they all had Improv.
+      if (info.improv === false) {
+        $("update-step").remove();
+        if (info.setupAp) {
+          $("wifi-step").replaceChildren(el("strong", {}, "WiFi:"), " after installing, join the ",
+            el("code", {}, info.setupAp), " WiFi network from your phone and pick your network there.");
+        } else {
+          $("wifi-step").remove();
+        }
+      } else if (info.setupAp) {
         $("wifi-step").append(" Or join the ", el("code", {}, info.setupAp),
           " WiFi network from your phone and pick your network there.");
       }
