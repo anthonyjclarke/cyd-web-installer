@@ -105,6 +105,23 @@ def data_partition(partitions_bin):
     return data, app_end
 
 
+# chip_id in the ESP image header (bytes 12-13) -> ESP Web Tools chipFamily,
+# which must equal the name esptool-js reports for the connected chip.
+CHIP_FAMILIES = {0: "ESP32", 2: "ESP32-S2", 5: "ESP32-C3", 9: "ESP32-S3",
+                 12: "ESP32-C2", 13: "ESP32-C6", 16: "ESP32-H2"}
+
+
+def chip_family(app_bin):
+    """ESP Web Tools chipFamily of a built app image, from its header."""
+    head = Path(app_bin).read_bytes()[:16]
+    if len(head) < 16 or head[0] != 0xE9:
+        sys.exit("error: %s is not an ESP app image" % app_bin)
+    chip_id = int.from_bytes(head[12:14], "little")
+    if chip_id not in CHIP_FAMILIES:
+        sys.exit("error: %s: unknown chip id %d" % (app_bin, chip_id))
+    return CHIP_FAMILIES[chip_id]
+
+
 def check_parts(env, parts):
     """Four separate parts, never the merged image (it wipes NVS)."""
     names = [Path(p["path"]).name for p in parts]
@@ -170,6 +187,7 @@ def main():
 
         built = json.loads(parts_file.read_text())
         check_parts(b["env"], built)
+        chip = chip_family(built[-1]["path"])
         parts = []
         for part in built:
             src = Path(part["path"])
@@ -203,11 +221,11 @@ def main():
             "name": project,
             "version": version,
             "new_install_prompt_erase": True,
-            "builds": [{"chipFamily": "ESP32", "parts": parts}],
+            "builds": [{"chipFamily": chip, "parts": parts}],
         }
         name = "manifest-%s.json" % b["env"]
         (out / name).write_text(json.dumps(manifest, indent=2) + "\n")
-        boards.append(dict(b, manifest=name))
+        boards.append(dict(b, manifest=name, chip=chip))
         print("%-14s %s" % (b["env"], ", ".join("0x%x" % p["offset"] for p in parts)))
 
     index = {

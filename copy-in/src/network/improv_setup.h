@@ -1,7 +1,7 @@
 /*
  * Improv-Serial WiFi Provisioning (from cyd-web-installer/copy-in)
  *
- * Improv-Serial over the CYD's USB bridge, listening on every boot - not only
+ * Improv-Serial over the board's USB serial port, listening on every boot - not only
  * on a fresh device as upstream does. ESP Web Tools uses it two ways:
  *
  *  - After an install it waits up to 10s for Improv and offers "Configure

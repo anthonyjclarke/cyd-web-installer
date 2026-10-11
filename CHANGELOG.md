@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.2.0] 12-10-2026
+
+### Added
+
+- ESP32-S3 (and other chip) support. `make_manifests.py` reads each env's
+  chip from the built app image header (chip ID 0 → `ESP32`, 9 → `ESP32-S3`,
+  and so on). It writes that as the manifest's `chipFamily`, which was
+  hardcoded to `ESP32`, and as `chip` per board in `index.json`.
+- The installer page notes that native-USB boards need no driver.
+
+### Changed
+
+- The README, comments and the workflow name now say "ESP32 projects", not
+  "CYD projects". The repo name and `cyd-release.yml` path are unchanged, so
+  callers need no edit.
+
+### Unchanged
+
+- ESP32 manifests are byte-identical to 1.1.0. `index.json` only gains
+  `chip`.
+
 ## [1.1.0] 10-10-2026
 
 ### Added

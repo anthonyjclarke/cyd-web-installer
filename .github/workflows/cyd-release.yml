@@ -1,4 +1,4 @@
-# Reusable firmware workflow for CYD projects. It builds every board on each
+# Reusable firmware workflow for ESP32 projects. It builds every board on each
 # push and pull request. On a `v*` tag it also publishes a GitHub release and
 # the web installer to the calling repo's GitHub Pages.
 #
@@ -11,7 +11,7 @@
 # Caller contract and the ~10-line caller: README.md. Extracted from
 # CYD_AnimatedPixelClock's firmware.yml (v1.4.0).
 
-name: CYD firmware
+name: Firmware
 
 on:
   workflow_call:

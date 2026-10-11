@@ -1,7 +1,8 @@
 # cyd-web-installer
 
-Shared ESP Web Tools installer tooling for ESP32 CYD (Cheap Yellow Display)
-projects. A project that adopts it gets a GitHub Pages page where anyone with
+Shared ESP Web Tools installer tooling for ESP32 PlatformIO projects. It was
+built for the CYD (Cheap Yellow Display) boards, and works for any ESP32 or
+ESP32-S3 project with a dual-OTA partition table. A project that adopts it gets a GitHub Pages page where anyone with
 Chrome or Edge picks their board, clicks **Install**, and ends up on WiFi. They
 don't need PlatformIO, esptool or drivers. Boards that already run the firmware
 are offered **Update**, which keeps their settings.
@@ -47,7 +48,7 @@ the Improv pieces (see [`copy-in/README.md`](copy-in/README.md)).
 | `custom_installer_hint` (optional)        | One line under the label               |
 | `custom_installer_fs = yes` (optional)    | Ships the filesystem image; see below  |
 | `extra_scripts = post:tools/merge_bin.py` | Writes `flash_parts.json`              |
-| Standard 4 MB dual-OTA partitions         | Frozen once released; one recipe       |
+| Dual-OTA partition table                  | `otadata` + two app slots; frozen      |
 | Improv-Serial, always on (advised)        | WiFi in the dialog; offers Update      |
 | `main` for releases, `dev` for work       | Tags must be on `main`                 |
 
@@ -60,6 +61,11 @@ its Update and Configure WiFi lines, because ESP Web Tools can offer neither.
 
 An env without `custom_installer_label` is still built in CI but left out of
 the installer.
+
+Each manifest's `chipFamily` (`ESP32`, `ESP32-S3`, …) comes from the chip ID
+in the built app image's header, so a project needs no setting for it. ESP Web
+Tools uses it to refuse an image built for a different chip. `index.json`
+also carries it per board as `chip`, which the hub uses as a filter.
 
 ### Filesystem image (optional, 1.1)
 
