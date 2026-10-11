@@ -2,7 +2,8 @@
 
 Shared ESP Web Tools installer tooling for ESP32 PlatformIO projects. It was
 built for the CYD (Cheap Yellow Display) boards, and works for any ESP32 or
-ESP32-S3 project with a dual-OTA partition table. A project that adopts it gets a GitHub Pages page where anyone with
+ESP32-S3 project with a dual-OTA partition table. The `cyd-` name is kept on
+purpose: it groups the repos that started on the CYD. A project that adopts it gets a GitHub Pages page where anyone with
 Chrome or Edge picks their board, clicks **Install**, and ends up on WiFi. They
 don't need PlatformIO, esptool or drivers. Boards that already run the firmware
 are offered **Update**, which keeps their settings.

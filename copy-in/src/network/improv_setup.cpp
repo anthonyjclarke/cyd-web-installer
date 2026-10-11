@@ -10,7 +10,7 @@
 #include "debug.h"
 
 #ifndef IMPROV_DEVICE_PREFIX
-#define IMPROV_DEVICE_PREFIX "CYD"
+#define IMPROV_DEVICE_PREFIX "ESP32"
 #endif
 
 static ImprovWiFi improvSerial(&Serial);

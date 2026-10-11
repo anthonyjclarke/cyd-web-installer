@@ -40,7 +40,7 @@ It needs these from `include/config.h` and `include/debug.h`:
 | `IMPROV_SETUP_ENABLED`  | `#define` 1 or 0              |
 | `PROJECT_NAME`          | string; never change it later |
 | `FIRMWARE_VERSION`      | string                        |
-| `IMPROV_DEVICE_PREFIX`  | optional `#define`, `"CYD"`   |
+| `IMPROV_DEVICE_PREFIX`  | optional `#define`, `"ESP32"` |
 | `DBG_INFO` / `DBG_WARN` | leveled debug macros          |
 
 `IMPROV_DEVICE_PREFIX` must be a macro, not a `constexpr`, because it is

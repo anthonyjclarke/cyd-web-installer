@@ -9,6 +9,8 @@
   and so on). It writes that as the manifest's `chipFamily`, which was
   hardcoded to `ESP32`, and as `chip` per board in `index.json`.
 - The installer page notes that native-USB boards need no driver.
+- The copy-in Improv module's default `IMPROV_DEVICE_PREFIX` is `"ESP32"`,
+  was `"CYD"`. Only projects that don't set their own prefix are affected.
 
 ### Changed
 
